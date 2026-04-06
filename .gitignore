@@ -1,0 +1,65 @@
+# Configuration files with sensitive data
+config.js
+
+# OS files
+.DS_Store
+Thumbs.db
+.Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.env
+.env.local
+.env.*.local
+
+# Editor files
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+.classpath
+
+# Dependencies (if adding Node/npm to project)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.min.css
+
+# Logs
+*.log
+npm-debug.log*
+debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# IDE
+.vscode/*
+.idea/*
+*.sublime-*
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# macOS
+.AppleDouble
+.AppleDB
+.LSOverride
+
+# Windows
+$RECYCLE.BIN/

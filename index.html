@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LendTrack v2</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Variables ─────────────────────────────────────────── */
+:root{
+  --ink:#0f0e17;--ink2:#2d2b3d;--ink3:#6b6880;
+  --paper:#faf9f6;--surf:#f0ede8;--surf2:#e4e0d8;
+  --gold:#c8922a;--gold-l:#fdf3e3;--gold-b:#e8c87a;
+  --green:#1a7a4a;--green-b:#e8f5ee;
+  --red:#b83232;--red-b:#fceaea;
+  --blue:#1e5fa8;--blue-b:#e8f0fb;
+  --orange:#c05c10;--orange-b:#fdf0e6;
+  --r:10px;--rl:14px;
+  --topbar-h:52px;
+  --bottomnav-h:62px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:15px;line-height:1.6;overscroll-behavior:none}
+
+/* topbar */
+.topbar{background:var(--ink);padding:0 1rem;display:flex;align-items:center;justify-content:space-between;height:var(--topbar-h);position:sticky;top:0;z-index:200}
+.brand{font-family:'DM Serif Display',serif;color:var(--gold);font-size:18px;line-height:1}
+.brand em{color:#fff;font-family:'DM Sans',sans-serif;font-size:11px;font-style:normal;font-weight:300;margin-left:7px;opacity:.4}
+.sync{font-size:11px;color:rgba(255,255,255,.4);display:flex;align-items:center;gap:5px}
+.dot{width:7px;height:7px;border-radius:50%;background:#4caf50;flex-shrink:0}
+.dot.spin{background:var(--gold);animation:pulse 1s infinite}
+.dot.err{background:#e53935}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* desktop scrollable top nav */
+.nav{background:var(--ink2);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nb{padding:11px 16px;font-size:13px;font-weight:500;color:rgba(255,255,255,.4);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s;font-family:'DM Sans',sans-serif;min-height:44px}
+.nb:hover{color:rgba(255,255,255,.7)}
+.nb.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* bottom tab bar */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--bottomnav-h);background:var(--ink);border-top:1px solid var(--ink2);z-index:300;padding-bottom:env(safe-area-inset-bottom)}
+.bottom-nav-inner{display:flex;align-items:stretch;height:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.bottom-nav-inner::-webkit-scrollbar{display:none}
+.bnb{flex:1;min-width:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 4px;white-space:nowrap;transition:color .15s;touch-action:manipulation}
+.bnb svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.bnb.active{color:var(--gold)}
+.more-menu{display:none;position:fixed;bottom:calc(var(--bottomnav-h) + 6px);right:8px;background:var(--ink2);border:1px solid rgba(255,255,255,.1);border-radius:var(--rl);overflow:hidden;min-width:160px;box-shadow:0 -4px 24px rgba(0,0,0,.4);z-index:400}
+.more-menu.open{display:block}
+.more-menu button{display:block;width:100%;padding:13px 18px;text-align:left;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:rgba(255,255,255,.7);background:none;border:none;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);min-height:44px}
+.more-menu button:last-child{border-bottom:none}
+.more-menu button.active{color:var(--gold)}
+
+/* layout */
+.main{max-width:780px;margin:0 auto;padding:1rem 1rem 1.5rem}
+.page{display:none;animation:fi .18s ease}
+.page.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* card */
+.card{background:#fff;border:1px solid var(--surf2);border-radius:var(--rl);padding:1rem 1.1rem;margin-bottom:.85rem}
+.card-title{font-family:'DM Serif Display',serif;font-size:16px;margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid var(--surf)}
+
+/* forms */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fg.f1{grid-template-columns:1fr}
+.fg.f3{grid-template-columns:1fr 1fr 1fr}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+.field input,.field select,.field textarea{padding:10px 12px;border:1px solid var(--surf2);border-radius:var(--r);font-size:16px;font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);outline:none;width:100%;transition:border-color .15s,box-shadow .15s;min-height:44px}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,146,42,.1)}
+.field textarea{resize:vertical;min-height:72px;font-size:15px}
+.field input[type=number]{font-family:'JetBrains Mono',monospace}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:var(--r);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;border:1px solid transparent;transition:all .15s;white-space:nowrap;min-height:44px;touch-action:manipulation}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--ink);color:var(--gold);border-color:var(--ink)}
+.btn-primary:hover{background:var(--ink2)}
+.btn-ghost{background:transparent;color:var(--ink3);border-color:var(--surf2)}
+.btn-ghost:hover{background:var(--surf);color:var(--ink)}
+.btn-success{background:var(--green-b);color:var(--green);border-color:#a8d9bc}
+.btn-success:hover{background:#d0eddc}
+.btn-danger{background:var(--red-b);color:var(--red);border-color:#f0b4b4}
+.btn-danger:hover{background:#fad8d8}
+.btn-gold{background:var(--gold);color:#fff;border-color:var(--gold)}
+.btn-gold:hover{background:#b07820}
+.btn-warn{background:var(--orange-b);color:var(--orange);border-color:#f0c89a}
+.btn-warn:hover{background:#fce3cc}
+.btn-blue{background:var(--blue-b);color:var(--blue);border-color:#b0c8f0}
+.btn-sm{padding:8px 12px;font-size:12px;min-height:36px}
+.btn-block{width:100%;padding:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:.85rem}
+
+/* metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:1rem}
+.metric{background:var(--ink);border-radius:var(--rl);padding:.8rem .5rem;text-align:center}
+.metric .mv{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--gold);word-break:break-all}
+.metric .ml{font-size:9px;color:rgba(255,255,255,.4);margin-top:3px;text-transform:uppercase;letter-spacing:.04em;line-height:1.3}
+.metrics-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.metrics-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+/* borrower items */
+.bi{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--surf)}
+.bi:last-child{border-bottom:none}
+.av{width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:13px;flex-shrink:0}
+.bm{flex:1;min-width:0}
+.bn{font-weight:600;font-size:14px}
+.bs{font-size:12px;color:var(--ink3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt{height:4px;background:var(--surf);border-radius:3px;overflow:hidden;margin-top:6px}
+.pf{height:100%;background:var(--green);border-radius:3px;transition:width .4s}
+.pf.warn{background:var(--gold)}
+.pf.bad{background:var(--red)}
+.pl{font-size:11px;color:var(--ink3);margin-top:3px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:2px}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.ba{background:var(--green-b);color:var(--green)}
+.bc{background:var(--surf);color:var(--ink3)}
+.br{background:var(--red-b);color:var(--red)}
+.bg{background:var(--gold-l);color:var(--gold);border:1px solid var(--gold-b)}
+.bo{background:var(--orange-b);color:var(--orange)}
+
+/* day grid */
+.day-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;margin:10px 0}
+.dc{aspect-ratio:1;border-radius:4px;border:1px solid var(--surf2);display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:500;cursor:pointer;transition:background .1s,border-color .1s;color:var(--ink3);background:var(--paper);user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.dc:active{opacity:.7}
+.dc.paid{background:var(--green-b);border-color:#a8d9bc;color:var(--green)}
+.dc.tod{border-color:var(--blue);color:var(--blue);border-width:2px;font-weight:700}
+.dc.ovd{background:var(--red-b);border-color:#f0b4b4;color:var(--red)}
+.dc.sel{background:var(--blue-b);border-color:var(--blue);color:var(--blue)}
+
+/* summary rows */
+.sr{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--surf);font-size:13px;gap:8px}
+.sr:last-child{border-bottom:none}
+.sr .sl{color:var(--ink3)}
+.sr .sv{font-family:'JetBrains Mono',monospace;font-weight:500;text-align:right}
+.sv.g{color:var(--green)}.sv.r{color:var(--red)}.sv.o{color:var(--orange)}
+
+/* alert card */
+.alert-card{background:var(--red-b);border:1px solid #f0b4b4;border-radius:var(--rl);padding:1rem 1.1rem;margin-bottom:.85rem}
+.alert-card .card-title{color:var(--red);border-bottom-color:#f0b4b4}
+
+/* risk score */
+.risk{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.risk-hi{background:var(--green-b);color:var(--green)}
+.risk-md{background:var(--gold-l);color:var(--gold)}
+.risk-lo{background:var(--red-b);color:var(--red)}
+
+/* streak badge */
+.streak-badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;background:var(--gold-l);color:var(--gold)}
+
+/* expense table */
+.etable{width:100%;border-collapse:collapse;font-size:13px}
+.etable th{font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;padding:5px 6px;text-align:left;border-bottom:1px solid var(--surf2)}
+.etable td{padding:7px 6px;border-bottom:1px solid var(--surf);vertical-align:middle}
+.etable tr:last-child td{border-bottom:none}
+.exp-card{background:var(--surf);border-radius:var(--r);padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.exp-card .ec-info{flex:1;min-width:0}
+.exp-card .ec-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-card .ec-sub{font-size:11px;color:var(--ink3);margin-top:1px}
+.exp-card .ec-amt{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;color:var(--red);flex-shrink:0}
+
+/* modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,14,23,.55);z-index:500;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;width:100%;max-height:92vh;overflow-y:auto;padding:1.25rem 1rem 1.5rem;border-radius:var(--rl) var(--rl) 0 0;box-shadow:0 -8px 40px rgba(15,14,23,.2)}
+.modal-handle{width:36px;height:4px;background:var(--surf2);border-radius:2px;margin:0 auto .85rem}
+.modal-title{font-family:'DM Serif Display',serif;font-size:18px;margin-bottom:1rem}
+.modal-close{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink3);line-height:1;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center}
+
+/* toast */
+.toast-w{position:fixed;bottom:calc(var(--bottomnav-h) + .75rem);left:50%;transform:translateX(-50%);z-index:999;pointer-events:none;width:calc(100% - 2rem);max-width:340px}
+.toast{background:var(--ink);color:var(--gold);padding:10px 20px;border-radius:30px;font-size:13px;font-weight:500;border:1px solid rgba(200,146,42,.3);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;text-align:center}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* spinner */
+.sp{display:inline-block;width:15px;height:15px;border:2px solid rgba(200,146,42,.3);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--ink3);font-size:13px}
+.sec-title{font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.6rem}
+.divider{border:none;border-top:1px solid var(--surf);margin:.85rem 0}
+.note-text{font-size:13px;color:var(--ink3);font-style:italic;background:var(--surf);border-radius:var(--r);padding:8px 12px;margin-top:7px;word-break:break-word}
+.history-item{font-size:12px;color:var(--ink3);padding:5px 0;border-bottom:1px solid var(--surf);display:flex;justify-content:space-between;gap:8px}
+.history-item:last-child{border-bottom:none}
+.col-actions{display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap}
+.col-actions select{flex:1;min-width:0}
+.ledger-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--surf)}
+.ledger-row:last-child{border-bottom:none}
+.ledger-info{flex:1;min-width:0}
+.ledger-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-sub{font-size:11px;color:var(--ink3);margin-top:1px}
+.ledger-amt{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;flex-shrink:0;text-align:right}
+
+/* ── Tablet ── */
+@media(max-width:900px){.metrics{gap:6px}.metric .mv{font-size:13px}}
+
+/* ── Mobile <600px ── */
+@media(max-width:599px){
+  :root{--topbar-h:48px;--bottomnav-h:60px}
+  .nav{display:none}
+  .bottom-nav{display:block}
+  .main{padding:.75rem .75rem calc(var(--bottomnav-h) + 1rem)}
+  .brand{font-size:16px}
+  .brand em{display:none}
+  .card{padding:.85rem .9rem;border-radius:12px;margin-bottom:.7rem}
+  .card-title{font-size:15px;margin-bottom:.85rem;padding-bottom:.5rem}
+  .fg,.fg.f3{grid-template-columns:1fr}
+  .metrics,.metrics-3{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .metrics-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .metric{padding:.7rem .4rem}
+  .metric .mv{font-size:13px}
+  .metric .ml{font-size:9px}
+  .btn{font-size:13px}
+  .btn-sm{min-height:36px;padding:7px 10px;font-size:12px}
+  .btn-row{gap:6px}
+  .btn-block{padding:13px}
+  .dc{font-size:9px}
+  .col-actions{flex-direction:column;align-items:stretch}
+  .col-actions select{width:100%}
+  .col-btn-row{display:flex;gap:6px}
+  .col-btn-row .btn{flex:1}
+  .overlay{align-items:flex-end}
+  .modal{border-radius:16px 16px 0 0;padding:1rem .9rem 1.5rem;max-height:88vh}
+  .etable-wrap{display:none}
+  .exp-cards{display:block}
+  .bi{gap:9px;padding:10px 0}
+  .av{width:34px;height:34px;font-size:12px}
+  .sr{font-size:12px}
+  .url-row{flex-direction:column}
+  .url-row .btn{width:100%}
+  .toast-w{bottom:calc(var(--bottomnav-h) + .5rem)}
+}
+
+/* ── Very small <360px ── */
+@media(max-width:359px){
+  .metrics,.metrics-3,.metrics-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .metric .mv{font-size:12px}
+  .day-grid{gap:2px}
+  .dc{font-size:8px}
+  .bnb{font-size:9px;min-width:44px}
+}
+
+/* ── Desktop ≥600px ── */
+@media(min-width:600px){
+  .bottom-nav{display:none}
+  .etable-wrap{display:block}
+  .exp-cards{display:none}
+  .url-row{flex-direction:row}
+  .toast-w{bottom:1.5rem;width:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">LendTrack<em>v2</em></div>
+  <div class="sync"><div class="dot" id="sync-dot"></div><span id="sync-lbl">Connected</span></div>
+</div>
+
+<div class="nav">
+  <button class="nb active" onclick="showPage('dashboard')">Dashboard</button>
+  <button class="nb" onclick="showPage('borrowers')">Borrowers</button>
+  <button class="nb" onclick="showPage('add')">+ Add</button>
+  <button class="nb" onclick="showPage('collection')">Collection</button>
+  <button class="nb" onclick="showPage('summary')">Summary</button>
+  <button class="nb" onclick="showPage('expenses')">Expenses</button>
+  <button class="nb" onclick="showPage('capital')">Capital</button>
+  <button class="nb" onclick="showPage('settings')">Settings</button>
+</div>
+
+<!-- ══ BOTTOM NAV (mobile) ══ -->
+<div class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="bnb active" id="bnb-dashboard" onclick="showPage('dashboard')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Home
+    </button>
+    <button class="bnb" id="bnb-borrowers" onclick="showPage('borrowers')">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Borrowers
+    </button>
+    <button class="bnb" id="bnb-collection" onclick="showPage('collection')">
+      <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Collect
+    </button>
+    <button class="bnb" id="bnb-add" onclick="showPage('add')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Add
+    </button>
+    <button class="bnb bnb-more" id="bnb-more" onclick="toggleMoreMenu()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      More
+    </button>
+  </div>
+  <div class="more-menu" id="more-menu">
+    <button onclick="showPage('summary');closeMoreMenu()">Summary</button>
+    <button onclick="showPage('expenses');closeMoreMenu()">Expenses</button>
+    <button onclick="showPage('capital');closeMoreMenu()">Capital</button>
+    <button onclick="showPage('settings');closeMoreMenu()">Settings</button>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══ DASHBOARD ══ -->
+<div id="page-dashboard" class="page active">
+  <div id="dash-eod"></div>
+  <div id="dash-alerts"></div>
+  <div id="dash-metrics"></div>
+  <div id="dash-streaks"></div>
+</div>
+
+<!-- ══ BORROWERS ══ -->
+<div id="page-borrowers" class="page">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="card-title" style="margin:0;border:none;padding:0">All Borrowers</div>
+      <div style="display:flex;gap:6px">
+        <select id="filter-status" onchange="renderBorrowers()" style="font-size:12px;padding:5px 8px;border:1px solid var(--surf2);border-radius:var(--r);background:var(--paper);color:var(--ink)">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="closed">Closed</option>
+          <option value="overdue">Overdue</option>
+        </select>
+      </div>
+    </div>
+    <div id="borrower-list"><div class="empty"><div class="sp"></div></div></div>
+  </div>
+</div>
+
+<!-- ══ ADD/EDIT ══ -->
+<div id="page-add" class="page">
+  <div class="card">
+    <div class="card-title" id="form-heading">New Borrower</div>
+    <div class="fg">
+      <div class="field"><label>Full Name *</label><input id="f-name" type="text" placeholder="Ravi Kumar"></div>
+      <div class="field"><label>Phone *</label><input id="f-phone" type="tel" placeholder="9876543210" maxlength="10"></div>
+    </div>
+    <div class="fg">
+      <div class="field"><label>Aadhar</label><input id="f-aadhar" type="text" placeholder="XXXX XXXX XXXX" maxlength="14" oninput="fmtAadhar(this)"></div>
+      <div class="field"><label>Start Date</label><input id="f-date" type="date"></div>
+    </div>
+    <div class="fg">
+      <div class="field"><label>Loan Amount (₹)</label><input id="f-amount" type="number" value="10000" min="1"></div>
+      <div class="field"><label>Daily Installment (₹)</label><input id="f-daily" type="number" value="100" min="1"></div>
+    </div>
+    <div class="fg f1">
+      <div class="field"><label>Address</label><textarea id="f-address" placeholder="Door no, Street, City..."></textarea></div>
+    </div>
+    <div class="fg f1">
+      <div class="field"><label>Notes (location, tips, contact info)</label><textarea id="f-notes" placeholder="e.g. Lives behind the temple, wife handles payments..."></textarea></div>
+    </div>
+    <input type="hidden" id="f-edit-id">
+    <div class="btn-row">
+      <button class="btn btn-primary btn-block" onclick="saveBorrower()" id="save-btn">Save Borrower</button>
+      <button class="btn btn-ghost btn-block" onclick="cancelEdit()" id="cancel-btn" style="display:none">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ COLLECTION ══ -->
+<div id="page-collection" class="page">
+  <div class="card">
+    <div class="card-title">Daily Collection</div>
+    <div class="col-actions">
+      <div class="field" style="margin:0">
+        <select id="col-select" onchange="renderCollection()">
+          <option value="">— Select Borrower —</option>
+        </select>
+      </div>
+      <div class="col-btn-row">
+        <button class="btn btn-success btn-sm" onclick="markToday()">✓ Today</button>
+        <button class="btn btn-blue btn-sm" onclick="openBulkModal()">Bulk Pay</button>
+      </div>
+    </div>
+    <div id="col-info"></div>
+    <div id="col-grid"></div>
+    <div id="col-notes"></div>
+    <div id="col-history"></div>
+  </div>
+</div>
+
+<!-- ══ SUMMARY ══ -->
+<div id="page-summary" class="page">
+  <div class="metrics metrics-3" id="sum-metrics"></div>
+  <div class="card"><div class="card-title">Borrower Breakdown</div><div id="sum-rows"></div></div>
+</div>
+
+<!-- ══ EXPENSES ══ -->
+<div id="page-expenses" class="page">
+  <div class="card">
+    <div class="card-title">Add Expense</div>
+    <div class="fg f3">
+      <div class="field"><label>Date</label><input id="ex-date" type="date"></div>
+      <div class="field"><label>Category</label>
+        <select id="ex-cat">
+          <option>Petrol</option><option>Phone</option><option>Food</option>
+          <option>Printing</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Amount (₹)</label><input id="ex-amount" type="number" placeholder="0" min="1"></div>
+    </div>
+    <div class="fg f1">
+      <div class="field"><label>Description</label><input id="ex-desc" type="text" placeholder="e.g. Petrol for collection rounds"></div>
+    </div>
+    <button class="btn btn-primary" onclick="addExpense()">Add Expense</button>
+  </div>
+  <div class="card">
+    <div class="card-title">Expense History</div>
+    <div class="etable-wrap" id="expense-list-desktop"></div>
+    <div class="exp-cards" id="expense-list-mobile"></div>
+    <div id="expense-list" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ══ CAPITAL ══ -->
+<div id="page-capital" class="page">
+  <div class="metrics metrics-2" id="cap-metrics"></div>
+  <div class="card">
+    <div class="card-title">Add Capital Entry</div>
+    <div class="fg f3">
+      <div class="field"><label>Date</label><input id="cap-date" type="date"></div>
+      <div class="field"><label>Type</label>
+        <select id="cap-type">
+          <option value="inject">Inject Capital</option>
+          <option value="withdraw">Withdraw</option>
+        </select>
+      </div>
+      <div class="field"><label>Amount (₹)</label><input id="cap-amount" type="number" placeholder="0" min="1"></div>
+    </div>
+    <div class="fg f1">
+      <div class="field"><label>Note</label><input id="cap-note" type="text" placeholder="e.g. Added savings for lending"></div>
+    </div>
+    <button class="btn btn-primary" onclick="addCapitalEntry()">Add Entry</button>
+  </div>
+  <div class="card">
+    <div class="card-title">Capital Ledger</div>
+    <div id="cap-ledger"><div class="empty"><div class="sp"></div></div></div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
+<div id="page-settings" class="page">
+  <div class="card" style="background:var(--gold-l);border-color:var(--gold-b)">
+    <div class="card-title">Google Sheets Setup</div>
+    <ol style="font-size:13px;color:var(--ink3);line-height:2.2;margin-left:18px;margin-bottom:1rem">
+      <li>Open your Google Sheet → <code style="background:rgba(0,0,0,.07);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px">Extensions</code> → <code style="background:rgba(0,0,0,.07);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px">Apps Script</code></li>
+      <li>Paste <strong>Code.gs</strong> contents, click Save</li>
+      <li>Deploy → New Deployment → Web App</li>
+      <li>Execute as: <strong>Me</strong> · Who has access: <strong>Anyone</strong></li>
+      <li>Copy the URL and paste below</li>
+    </ol>
+    <div class="url-row" style="display:flex;gap:8px">
+      <div class="field" style="flex:1;margin:0"><input type="url" id="url-input" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <button class="btn btn-gold" onclick="saveUrl()">Save & Connect</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Connection</div>
+    <div id="conn-status" style="font-size:13px;color:var(--ink3)">Checking…</div>
+    <div class="btn-row" style="margin-top:.75rem">
+      <button class="btn btn-ghost btn-sm" onclick="testConn()">Test Connection</button>
+      <button class="btn btn-ghost btn-sm" onclick="refreshAll()">Refresh Data</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ══ BULK MODAL ══ -->
+<div class="overlay" id="bulk-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="modal-title">Bulk Payment Entry</div>
+      <button class="modal-close" onclick="closeBulkModal()">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--ink3);margin-bottom:1rem">Select the days to mark as paid at once.</p>
+    <div id="bulk-grid"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;font-size:13px;color:var(--ink3)">
+      <span id="bulk-count">0 days selected</span>
+      <button class="btn btn-ghost btn-sm" onclick="selectAllUnpaid()">Select all unpaid</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success btn-block" onclick="submitBulk()">Mark Selected Paid</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BORROWER DETAIL MODAL ══ -->
+<div class="overlay" id="detail-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="modal-title" id="detail-title">Borrower Detail</div>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<div class="toast-w"><div class="toast" id="toast"></div></div>
+
+<script src="config.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────
+let borrowers=[], payments={}, expenses=[], capitalEntries=[], loanHistory=[];
+let bulkSelected=new Set(), bulkBorrowerId='';
+
+// ── API ────────────────────────────────────────────────────
+function sUrl(){return localStorage.getItem('lt_url')||CONFIG.SCRIPT_URL||'';}
+function setSyncing(on){
+  document.getElementById('sync-dot').className='dot'+(on?' spin':'');
+  document.getElementById('sync-lbl').textContent=on?'Syncing…':'Connected';
+}
+function setErr(){
+  document.getElementById('sync-dot').className='dot err';
+  document.getElementById('sync-lbl').textContent='Error';
+}
+async function api(params){
+  const u=sUrl();
+  if(!u||u==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') throw new Error('Not configured. Go to Settings.');
+  setSyncing(true);
+  try{
+    const r=await fetch(u+'?'+new URLSearchParams(params));
+    const d=await r.json();
+    if(d.error) throw new Error(d.error);
+    return d;
+  }finally{setSyncing(false);}
+}
+async function apiPost(body){
+  const u=sUrl();
+  if(!u||u==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') throw new Error('Not configured. Go to Settings.');
+  setSyncing(true);
+  try{
+    const r=await fetch(u,{method:'POST',body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.error) throw new Error(d.error);
+    return d;
+  }finally{setSyncing(false);}
+}
+async function refreshAll(){
+  try{
+    [borrowers,payments,expenses,capitalEntries,loanHistory]=await Promise.all([
+      api({action:'getBorrowers'}),
+      api({action:'getAllPayments'}),
+      api({action:'getExpenses'}),
+      api({action:'getCapital'}),
+      api({action:'getLoanHistory'})
+    ]);
+    renderCurrentPage();
+    toast('Data refreshed');
+  }catch(e){setErr();toast('⚠ '+e.message);}
+}
+
+// ── Nav ────────────────────────────────────────────────────
+const PAGES=['dashboard','borrowers','add','collection','summary','expenses','capital','settings'];
+function showPage(p){
+  PAGES.forEach(n=>{
+    document.getElementById('page-'+n).classList.toggle('active',n===p);
+  });
+  document.querySelectorAll('.nb').forEach((b,i)=>b.classList.toggle('active',PAGES[i]===p));
+  // bottom nav active state
+  ['dashboard','borrowers','collection','add'].forEach(id=>{
+    const el=document.getElementById('bnb-'+id);
+    if(el) el.classList.toggle('active',id===p);
+  });
+  const moreActive=['summary','expenses','capital','settings'].includes(p);
+  const moreBtn=document.getElementById('bnb-more');
+  if(moreBtn) moreBtn.classList.toggle('active',moreActive);
+  // update more-menu button active states
+  document.querySelectorAll('#more-menu button').forEach(b=>{
+    const pg=b.getAttribute('onclick')||'';
+    const match=pg.match(/showPage\('(\w+)'/);
+    if(match) b.classList.toggle('active',match[1]===p);
+  });
+  if(p==='dashboard')  renderDashboard();
+  if(p==='borrowers')  renderBorrowers();
+  if(p==='collection') renderCollectionSelect();
+  if(p==='summary')    renderSummary();
+  if(p==='expenses')   renderExpenses();
+  if(p==='capital')    renderCapital();
+  if(p==='settings')   renderSettings();
+}
+function toggleMoreMenu(){
+  document.getElementById('more-menu').classList.toggle('open');
+}
+function closeMoreMenu(){
+  document.getElementById('more-menu').classList.remove('open');
+}
+// close more menu on outside tap
+document.addEventListener('click',function(e){
+  const menu=document.getElementById('more-menu');
+  const btn=document.getElementById('bnb-more');
+  if(menu&&!menu.contains(e.target)&&btn&&!btn.contains(e.target)){
+    menu.classList.remove('open');
+  }
+});
+function renderCurrentPage(){
+  const a=PAGES.find(p=>document.getElementById('page-'+p).classList.contains('active'));
+  if(a) showPage(a);
+}
+
+// ── Toast ──────────────────────────────────────────────────
+let tt;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+// ── Helpers ────────────────────────────────────────────────
+function fmtAadhar(el){let v=el.value.replace(/\D/g,'').substring(0,12);el.value=v.replace(/(\d{4})(?=\d)/g,'$1 ').trim();}
+function initDate(id='f-date'){document.getElementById(id).value=new Date().toISOString().split('T')[0];}
+function initals(n){return n.trim().split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2);}
+function fm(n){return '₹'+Number(n).toLocaleString('en-IN');}
+function totalDays(b){return Math.round(b.amount/b.daily);}
+function paidDays(id){return(payments[id]||[]).length;}
+function pendingDays(b){return Math.max(0,totalDays(b)-paidDays(b.id));}
+function overdueDays(b){
+  if(!b.startDate) return 0;
+  const elapsed=Math.floor((new Date()-new Date(b.startDate))/86400000)+1;
+  return Math.max(0,Math.min(elapsed,totalDays(b))-paidDays(b.id));
+}
+function todayDay(b){
+  if(!b.startDate) return null;
+  const d=Math.floor((new Date()-new Date(b.startDate))/86400000)+1;
+  return(d>=1&&d<=totalDays(b))?d:null;
+}
+
+// Consecutive missed days
+function consecMissed(b){
+  const td=todayDay(b); if(!td) return 0;
+  const paid=new Set(payments[b.id]||[]);
+  let streak=0;
+  for(let d=td;d>=1;d--){
+    if(!paid.has(d)) streak++; else break;
+  }
+  return streak;
+}
+
+// Current paid streak
+function paidStreak(b){
+  const td=todayDay(b); if(!td) return 0;
+  const paid=new Set(payments[b.id]||[]);
+  let streak=0;
+  for(let d=td;d>=1;d--){
+    if(paid.has(d)) streak++; else break;
+  }
+  return streak;
+}
+
+// Risk score 0-100 (higher = better/safer)
+function riskScore(b){
+  const total=totalDays(b); if(total===0) return 50;
+  const paid=paidDays(b.id);
+  const od=overdueDays(b);
+  const cs=consecMissed(b);
+  const ps=paidStreak(b);
+  const lh=loanHistory.filter(l=>l.borrowerId===b.id);
+  let score=50;
+  if(total>0) score+=(paid/total)*30;       // % paid
+  if(od===0) score+=10; else score-=Math.min(od*2,20); // overdue penalty
+  if(cs>=5) score-=20; else if(cs>=3) score-=10;       // consecutive miss
+  if(ps>=7) score+=10; else if(ps>=3) score+=5;         // good streak
+  if(lh.length>1) score+=5;                             // repeat borrower
+  return Math.max(0,Math.min(100,Math.round(score)));
+}
+
+function riskClass(s){return s>=70?'risk-hi':s>=45?'risk-md':'risk-lo';}
+function riskLabel(s){return s>=70?'Low Risk':s>=45?'Medium':'High Risk';}
+
+// Today's expected vs actual
+function todayStats(){
+  const today=new Date().toISOString().split('T')[0];
+  let expected=0, collected=0, activeBorrowers=0;
+  borrowers.forEach(b=>{
+    if(b.status==='closed') return;
+    const td=todayDay(b);
+    if(td){
+      expected+=Number(b.daily);
+      activeBorrowers++;
+      if((payments[b.id]||[]).includes(td)) collected+=Number(b.daily);
+    }
+  });
+  return{expected,collected,shortfall:expected-collected,activeBorrowers};
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────
+function renderDashboard(){
+  const ts=todayStats();
+  const todayStr=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
+
+  // End-of-day panel
+  document.getElementById('dash-eod').innerHTML=`
+    <div class="card" style="background:var(--ink);border-color:var(--ink2)">
+      <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">${todayStr}</div>
+      <div class="metrics metrics-3" style="margin-bottom:0">
+        <div class="metric"><div class="mv">${fm(ts.expected)}</div><div class="ml">Expected Today</div></div>
+        <div class="metric"><div class="mv" style="color:#4caf50">${fm(ts.collected)}</div><div class="ml">Collected</div></div>
+        <div class="metric"><div class="mv" style="color:${ts.shortfall>0?'#e57373':var_gold}">${fm(ts.shortfall)}</div><div class="ml">Shortfall</div></div>
+      </div>
+    </div>`;
+
+  // Defaulter alerts (3+ consecutive missed days)
+  const defaulters=borrowers.filter(b=>b.status!=='closed'&&consecMissed(b)>=3);
+  if(defaulters.length){
+    let html=`<div class="alert-card"><div class="card-title">⚠ Defaulter Alerts (${defaulters.length})</div>`;
+    html+=defaulters.map(b=>{
+      const cm=consecMissed(b);
+      return `<div class="bi">
+        <div class="av">${initals(b.name)}</div>
+        <div class="bm">
+          <div class="bn">${b.name} <span class="badge br">${cm} days missed in a row</span></div>
+          <div class="bs">${b.phone} · ${fm(overdueDays(b)*b.daily)} overdue</div>
+          ${b.notes?`<div class="note-text">${b.notes}</div>`:''}
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="openColForBorrower('${b.id}')">Collect</button>
+      </div>`;
+    }).join('');
+    html+='</div>';
+    document.getElementById('dash-alerts').innerHTML=html;
+  } else {
+    document.getElementById('dash-alerts').innerHTML=`
+      <div class="card" style="border-color:#a8d9bc;background:var(--green-b)">
+        <div style="font-size:13px;color:var(--green);font-weight:500">✓ No defaulters today — all borrowers are within 2 missed days</div>
+      </div>`;
+  }
+
+  // Portfolio metrics
+  const active=borrowers.filter(b=>b.status!=='closed');
+  const totalLoaned=active.reduce((s,b)=>s+Number(b.amount),0);
+  const totalCollected=active.reduce((s,b)=>s+paidDays(b.id)*Number(b.daily),0);
+  const totalPending=active.reduce((s,b)=>s+pendingDays(b)*Number(b.daily),0);
+  document.getElementById('dash-metrics').innerHTML=`
+    <div class="metrics" style="margin-bottom:1rem">
+      <div class="metric"><div class="mv">${active.length}</div><div class="ml">Active Loans</div></div>
+      <div class="metric"><div class="mv">${fm(totalLoaned)}</div><div class="ml">Deployed</div></div>
+      <div class="metric"><div class="mv">${fm(totalCollected)}</div><div class="ml">Recovered</div></div>
+      <div class="metric"><div class="mv">${fm(totalPending)}</div><div class="ml">Pending</div></div>
+    </div>`;
+
+  // Top streaks
+  const withStreaks=borrowers.filter(b=>b.status!=='closed'&&paidStreak(b)>=3)
+    .sort((a,b)=>paidStreak(b)-paidStreak(a)).slice(0,4);
+  if(withStreaks.length){
+    let sh=`<div class="card"><div class="card-title">🔥 Payment Streaks</div><div style="display:flex;flex-wrap:wrap;gap:8px">`;
+    sh+=withStreaks.map(b=>`
+      <div style="display:flex;align-items:center;gap:8px;background:var(--surf);border-radius:var(--r);padding:8px 12px">
+        <div class="av" style="width:30px;height:30px;font-size:12px">${initals(b.name)}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600">${b.name}</div>
+          <div class="streak-badge">🔥 ${paidStreak(b)} day streak</div>
+        </div>
+      </div>`).join('');
+    sh+='</div></div>';
+    document.getElementById('dash-streaks').innerHTML=sh;
+  } else {
+    document.getElementById('dash-streaks').innerHTML='';
+  }
+}
+function var_gold(){return 'var(--gold)';}
+
+// ── BORROWERS ─────────────────────────────────────────────
+function renderBorrowers(){
+  const filter=document.getElementById('filter-status').value;
+  const el=document.getElementById('borrower-list');
+  let list=borrowers;
+  if(filter==='active') list=borrowers.filter(b=>b.status!=='closed');
+  else if(filter==='closed') list=borrowers.filter(b=>b.status==='closed');
+  else if(filter==='overdue') list=borrowers.filter(b=>overdueDays(b)>0&&b.status!=='closed');
+
+  if(!list.length){el.innerHTML='<div class="empty">No borrowers found.</div>';return;}
+  el.innerHTML=list.map(b=>{
+    const paid=paidDays(b.id), total=totalDays(b);
+    const pct=Math.round(paid/total*100);
+    const od=overdueDays(b), done=b.status==='closed'||paid>=total;
+    const cm=consecMissed(b), ps=paidStreak(b);
+    const rs=riskScore(b);
+    return `<div class="bi">
+      <div class="risk ${riskClass(rs)}" title="${riskLabel(rs)}: ${rs}/100">${rs}</div>
+      <div class="bm">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          <span class="bn">${b.name}</span>
+          <span class="badge ${done?'bc':od>0?'br':cm>=3?'bo':'ba'}">${done?'Closed':od>0?od+' overdue':cm>=3?cm+' missed':'Active'}</span>
+          ${ps>=3?`<span class="streak-badge">🔥${ps}</span>`:''}
+        </div>
+        <div class="bs">${b.phone}${b.aadhar?' · '+b.aadhar:''}</div>
+        <div class="pt"><div class="pf ${od>0?'bad':pct<50?'warn':''}" style="width:${pct}%"></div></div>
+        <div class="pl"><span>${paid}/${total} days · ${fm(paid*b.daily)}</span><span>${done?'Done':fm(pendingDays(b)*b.daily)+' left'}</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${b.id}')">Detail</button>
+        <button class="btn btn-ghost btn-sm" onclick="editBorrower('${b.id}')">Edit</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ADD/EDIT ───────────────────────────────────────────────
+async function saveBorrower(){
+  const name=document.getElementById('f-name').value.trim();
+  const phone=document.getElementById('f-phone').value.trim();
+  if(!name||!phone){toast('⚠ Name and phone required');return;}
+  if(!/^\d{10}$/.test(phone)){toast('⚠ Phone must be 10 digits');return;}
+  const data={
+    name,phone,
+    aadhar:document.getElementById('f-aadhar').value.trim(),
+    address:document.getElementById('f-address').value.trim(),
+    notes:document.getElementById('f-notes').value.trim(),
+    amount:parseFloat(document.getElementById('f-amount').value)||10000,
+    daily:parseFloat(document.getElementById('f-daily').value)||100,
+    startDate:document.getElementById('f-date').value
+  };
+  const editId=document.getElementById('f-edit-id').value;
+  const btn=document.getElementById('save-btn');
+  btn.disabled=true; btn.innerHTML='<span class="sp"></span> Saving…';
+  try{
+    if(editId){
+      data.id=editId;
+      await apiPost({action:'updateBorrower',data});
+      const idx=borrowers.findIndex(b=>b.id===editId);
+      if(idx>-1) borrowers[idx]={...borrowers[idx],...data};
+      toast('Updated!');
+    }else{
+      const res=await apiPost({action:'addBorrower',data});
+      borrowers.push({...data,id:res.id,createdAt:new Date().toISOString(),status:'active'});
+      toast('Borrower added!');
+    }
+    clearForm(); showPage('borrowers');
+  }catch(e){toast('⚠ '+e.message);}
+  finally{btn.disabled=false;btn.textContent='Save Borrower';}
+}
+
+function editBorrower(id){
+  const b=borrowers.find(x=>x.id===id); if(!b) return;
+  document.getElementById('f-name').value=b.name;
+  document.getElementById('f-phone').value=b.phone;
+  document.getElementById('f-aadhar').value=b.aadhar||'';
+  document.getElementById('f-address').value=b.address||'';
+  document.getElementById('f-notes').value=b.notes||'';
+  document.getElementById('f-amount').value=b.amount;
+  document.getElementById('f-daily').value=b.daily;
+  document.getElementById('f-date').value=b.startDate||'';
+  document.getElementById('f-edit-id').value=id;
+  document.getElementById('form-heading').textContent='Edit Borrower';
+  document.getElementById('cancel-btn').style.display='';
+  showPage('add');
+}
+
+function cancelEdit(){clearForm();showPage('borrowers');}
+function clearForm(){
+  ['f-name','f-phone','f-aadhar','f-address','f-notes','f-edit-id'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('f-amount').value=10000;
+  document.getElementById('f-daily').value=100;
+  document.getElementById('form-heading').textContent='New Borrower';
+  document.getElementById('cancel-btn').style.display='none';
+  initDate();
+}
+
+// ── DETAIL MODAL ───────────────────────────────────────────
+async function openDetail(id){
+  const b=borrowers.find(x=>x.id===id); if(!b) return;
+  document.getElementById('detail-title').textContent=b.name;
+  const rs=riskScore(b), cm=consecMissed(b), ps=paidStreak(b);
+  const od=overdueDays(b), paid=paidDays(id), total=totalDays(b);
+  const bHistory=loanHistory.filter(l=>l.borrowerId===id);
+
+  let html=`
+    <div class="metrics metrics-2" style="margin-bottom:1rem">
+      <div class="metric"><div class="mv">${rs}</div><div class="ml">Risk Score</div></div>
+      <div class="metric"><div class="mv">${ps}</div><div class="ml">Paid Streak</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:1rem">
+      <div><span style="color:var(--ink3)">Phone:</span> ${b.phone}</div>
+      <div><span style="color:var(--ink3)">Aadhar:</span> ${b.aadhar||'—'}</div>
+      <div><span style="color:var(--ink3)">Loan:</span> ${fm(b.amount)}</div>
+      <div><span style="color:var(--ink3)">Daily:</span> ${fm(b.daily)}</div>
+      <div><span style="color:var(--ink3)">Start:</span> ${b.startDate||'—'}</div>
+      <div><span style="color:var(--ink3)">Progress:</span> ${paid}/${total} days</div>
+    </div>`;
+
+  if(b.address) html+=`<div style="font-size:13px;color:var(--ink3);margin-bottom:.5rem">📍 ${b.address}</div>`;
+  if(b.notes)   html+=`<div class="note-text">📝 ${b.notes}</div>`;
+
+  if(od>0) html+=`<div style="margin-top:.75rem;padding:.5rem .75rem;background:var(--red-b);border-radius:var(--r);font-size:13px;color:var(--red)">${od} days overdue · ${fm(od*b.daily)} pending</div>`;
+  if(cm>=3) html+=`<div style="margin-top:.5rem;padding:.5rem .75rem;background:var(--orange-b);border-radius:var(--r);font-size:13px;color:var(--orange)">${cm} consecutive days missed</div>`;
+
+  if(bHistory.length>0){
+    html+=`<hr class="divider"><div class="sec-title">Loan History (${bHistory.length} loan${bHistory.length>1?'s':''})</div>`;
+    html+=bHistory.map(l=>`
+      <div class="history-item">
+        <span>${fm(l.amount)} · ${fm(l.daily)}/day · from ${l.startDate||'?'}</span>
+        <span class="badge ${l.status==='active'?'ba':'bc'}">${l.status}</span>
+      </div>`).join('');
+  }
+
+  const done=paid>=total||b.status==='closed';
+  html+=`<div class="btn-row" style="margin-top:1rem">
+    <button class="btn btn-ghost btn-sm" onclick="editBorrower('${id}');closeDetailModal()">Edit</button>
+    ${!done?`<button class="btn btn-warn btn-sm" onclick="openRenewModal('${id}')">Renew Loan</button>`:''}
+    ${!done?`<button class="btn btn-success btn-sm" onclick="closeDetailModal();openColForBorrower('${id}')">Collect</button>`:''}
+    ${done&&b.status!=='closed'?`<button class="btn btn-ghost btn-sm" onclick="closeLoan('${id}')">Mark Closed</button>`:''}
+    <button class="btn btn-danger btn-sm" onclick="confirmDelete('${id}','${b.name}')">Delete</button>
+  </div>`;
+
+  document.getElementById('detail-body').innerHTML=html;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+function closeDetailModal(){document.getElementById('detail-overlay').classList.remove('open');}
+
+async function closeLoan(id){
+  if(!confirm('Mark this loan as closed?')) return;
+  try{
+    await apiPost({action:'closeLoan',borrowerId:id});
+    const idx=borrowers.findIndex(b=>b.id===id);
+    if(idx>-1) borrowers[idx].status='closed';
+    closeDetailModal(); renderBorrowers(); toast('Loan closed.');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+function openRenewModal(id){
+  closeDetailModal();
+  const b=borrowers.find(x=>x.id===id); if(!b) return;
+  document.getElementById('f-edit-id').value=id;
+  document.getElementById('f-name').value=b.name;
+  document.getElementById('f-phone').value=b.phone;
+  document.getElementById('f-aadhar').value=b.aadhar||'';
+  document.getElementById('f-address').value=b.address||'';
+  document.getElementById('f-notes').value=b.notes||'';
+  document.getElementById('f-amount').value=10000;
+  document.getElementById('f-daily').value=100;
+  initDate();
+  document.getElementById('form-heading').textContent='Renew Loan — '+b.name;
+  document.getElementById('cancel-btn').style.display='';
+  document.getElementById('save-btn').textContent='Renew Loan';
+  document.getElementById('save-btn').onclick=()=>renewLoan(id);
+  showPage('add');
+}
+
+async function renewLoan(id){
+  const data={
+    name:document.getElementById('f-name').value.trim(),
+    phone:document.getElementById('f-phone').value.trim(),
+    aadhar:document.getElementById('f-aadhar').value.trim(),
+    address:document.getElementById('f-address').value.trim(),
+    notes:document.getElementById('f-notes').value.trim(),
+    amount:parseFloat(document.getElementById('f-amount').value)||10000,
+    daily:parseFloat(document.getElementById('f-daily').value)||100,
+    startDate:document.getElementById('f-date').value
+  };
+  try{
+    await apiPost({action:'renewLoan',borrowerId:id,data});
+    const idx=borrowers.findIndex(b=>b.id===id);
+    if(idx>-1) borrowers[idx]={...borrowers[idx],...data,status:'active'};
+    payments[id]=[];
+    toast('Loan renewed!');
+    clearForm();
+    document.getElementById('save-btn').onclick=saveBorrower;
+    document.getElementById('save-btn').textContent='Save Borrower';
+    showPage('borrowers');
+    await refreshAll();
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+async function confirmDelete(id,name){
+  if(!confirm('Delete '+name+'? This removes all payment records too.')) return;
+  try{
+    await apiPost({action:'deleteBorrower',id});
+    borrowers=borrowers.filter(b=>b.id!==id);
+    delete payments[id];
+    closeDetailModal(); renderBorrowers(); toast('Deleted.');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+// ── COLLECTION ─────────────────────────────────────────────
+function openColForBorrower(id){
+  showPage('collection');
+  setTimeout(()=>{
+    document.getElementById('col-select').value=id;
+    renderCollection();
+  },50);
+}
+
+function renderCollectionSelect(){
+  const sel=document.getElementById('col-select');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Select Borrower —</option>'+
+    borrowers.filter(b=>b.status!=='closed').map(b=>`<option value="${b.id}" ${b.id===cur?'selected':''}>${b.name}${overdueDays(b)>0?' ⚠':''}</option>`).join('');
+  renderCollection();
+}
+
+function renderCollection(){
+  const id=document.getElementById('col-select').value;
+  const info=document.getElementById('col-info');
+  const grid=document.getElementById('col-grid');
+  const notes=document.getElementById('col-notes');
+  const hist=document.getElementById('col-history');
+  if(!id){
+    info.innerHTML=''; notes.innerHTML=''; hist.innerHTML='';
+    grid.innerHTML='<div class="empty">Select a borrower to manage collection</div>';
+    return;
+  }
+  const b=borrowers.find(x=>x.id===id); if(!b) return;
+  const paid=paidDays(id), total=totalDays(b), pct=Math.round(paid/total*100);
+  const td=todayDay(b), od=overdueDays(b), cm=consecMissed(b), ps=paidStreak(b);
+
+  info.innerHTML=`
+    <div class="metrics metrics-3" style="margin-bottom:.75rem">
+      <div class="metric"><div class="mv">${fm(paid*b.daily)}</div><div class="ml">Collected</div></div>
+      <div class="metric"><div class="mv">${fm(pendingDays(b)*b.daily)}</div><div class="ml">Pending</div></div>
+      <div class="metric"><div class="mv">${pct}%</div><div class="ml">Progress</div></div>
+    </div>
+    <div class="pt" style="margin-bottom:6px"><div class="pf ${od>0?'bad':''}" style="width:${pct}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink3);margin-bottom:10px">
+      <span>${paid}/${total} days · tap cell to toggle</span>
+      <span>${od>0?'<span style="color:var(--red)">'+od+' overdue</span>':ps>=3?'<span style="color:var(--gold)">🔥 '+ps+' streak</span>':'On track'}</span>
+    </div>
+    ${cm>=3?`<div style="padding:7px 12px;background:var(--red-b);border-radius:var(--r);font-size:13px;color:var(--red);margin-bottom:8px">⚠ ${cm} consecutive days missed</div>`:''}`;
+
+  const paidSet=new Set(payments[id]||[]);
+  let cells='<div class="day-grid">';
+  for(let d=1;d<=total;d++){
+    const ip=paidSet.has(d), it=d===td, io=!ip&&td&&d<td;
+    cells+=`<div class="dc ${ip?'paid':io?'ovd':it?'tod':''}" onclick="toggleDay('${id}',${d},this)">${d}</div>`;
+  }
+  cells+='</div>';
+  grid.innerHTML=cells;
+
+  notes.innerHTML=b.notes?`<div class="note-text">📝 ${b.notes}</div>`:'';
+  hist.innerHTML='';
+}
+
+async function toggleDay(id,day,el){
+  const b=borrowers.find(x=>x.id===id);
+  try{
+    const res=await apiPost({action:'togglePayment',borrowerId:id,day,amount:b?Number(b.daily):0});
+    if(!payments[id]) payments[id]=[];
+    if(res.action==='added'){
+      payments[id].push(day); el.className='dc paid'; toast('Day '+day+' paid');
+    }else{
+      payments[id]=payments[id].filter(d=>d!==day);
+      const td=b?todayDay(b):null, io=td&&day<td;
+      el.className='dc'+(io?' ovd':day===td?' tod':'');
+      toast('Day '+day+' unmarked');
+    }
+    renderCollection();
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+async function markToday(){
+  const id=document.getElementById('col-select').value;
+  if(!id){toast('Select a borrower first');return;}
+  const b=borrowers.find(x=>x.id===id);
+  if(!b||!b.startDate){toast('No start date set');return;}
+  const day=todayDay(b);
+  if(!day){toast('Today is outside loan period');return;}
+  if((payments[id]||[]).includes(day)){toast('Today already marked');return;}
+  try{
+    await apiPost({action:'togglePayment',borrowerId:id,day,amount:Number(b.daily)});
+    if(!payments[id]) payments[id]=[];
+    payments[id].push(day);
+    renderCollection(); toast('Day '+day+' marked paid!');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+// ── BULK PAYMENT ───────────────────────────────────────────
+function openBulkModal(){
+  const id=document.getElementById('col-select').value;
+  if(!id){toast('Select a borrower first');return;}
+  const b=borrowers.find(x=>x.id===id); if(!b) return;
+  bulkBorrowerId=id; bulkSelected.clear();
+  const total=totalDays(b);
+  const paidSet=new Set(payments[id]||[]);
+  let cells='<div class="day-grid">';
+  for(let d=1;d<=total;d++){
+    const ip=paidSet.has(d);
+    cells+=`<div class="dc ${ip?'paid':''}" ${!ip?`onclick="toggleBulkSel(${d},this)"`:''}>${d}</div>`;
+  }
+  cells+='</div>';
+  document.getElementById('bulk-grid').innerHTML=cells;
+  document.getElementById('bulk-count').textContent='0 days selected';
+  document.getElementById('bulk-overlay').classList.add('open');
+}
+function closeBulkModal(){document.getElementById('bulk-overlay').classList.remove('open');bulkSelected.clear();}
+function toggleBulkSel(day,el){
+  if(bulkSelected.has(day)){bulkSelected.delete(day);el.classList.remove('sel');}
+  else{bulkSelected.add(day);el.classList.add('sel');}
+  document.getElementById('bulk-count').textContent=bulkSelected.size+' day'+(bulkSelected.size!==1?'s':'')+' selected';
+}
+function selectAllUnpaid(){
+  const id=bulkBorrowerId; const b=borrowers.find(x=>x.id===id); if(!b) return;
+  const paidSet=new Set(payments[id]||[]);
+  document.querySelectorAll('#bulk-grid .dc:not(.paid)').forEach((el,i)=>{
+    const day=i+1+Array.from(document.querySelectorAll('#bulk-grid .dc')).indexOf(el)-(i);
+    // Re-read from element's text
+    const d=parseInt(el.textContent);
+    if(!paidSet.has(d)){bulkSelected.add(d);el.classList.add('sel');}
+  });
+  // simpler: re-build selection from day grid
+  document.querySelectorAll('#bulk-grid .dc:not(.paid)').forEach(el=>{
+    const d=parseInt(el.textContent); bulkSelected.add(d); el.classList.add('sel');
+  });
+  document.getElementById('bulk-count').textContent=bulkSelected.size+' days selected';
+}
+async function submitBulk(){
+  if(!bulkSelected.size){toast('Select at least one day');return;}
+  const b=borrowers.find(x=>x.id===bulkBorrowerId); if(!b) return;
+  try{
+    const days=Array.from(bulkSelected).sort((a,b)=>a-b);
+    const res=await apiPost({action:'bulkPayment',borrowerId:bulkBorrowerId,days,amount:Number(b.daily)});
+    if(!payments[bulkBorrowerId]) payments[bulkBorrowerId]=[];
+    res.added.forEach(d=>payments[bulkBorrowerId].push(d));
+    closeBulkModal(); renderCollection();
+    toast(res.added.length+' days marked paid!');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+// ── SUMMARY ────────────────────────────────────────────────
+function renderSummary(){
+  const active=borrowers.filter(b=>b.status!=='closed');
+  const tl=active.reduce((s,b)=>s+Number(b.amount),0);
+  const tc=active.reduce((s,b)=>s+paidDays(b.id)*Number(b.daily),0);
+  const tp=active.reduce((s,b)=>s+pendingDays(b)*Number(b.daily),0);
+  document.getElementById('sum-metrics').innerHTML=`
+    <div class="metric"><div class="mv">${fm(tl)}</div><div class="ml">Total Loaned</div></div>
+    <div class="metric"><div class="mv">${fm(tc)}</div><div class="ml">Collected</div></div>
+    <div class="metric"><div class="mv">${fm(tp)}</div><div class="ml">Pending</div></div>`;
+
+  if(!borrowers.length){document.getElementById('sum-rows').innerHTML='<div class="empty">No data yet</div>';return;}
+
+  const actCount=active.length;
+  const closedCount=borrowers.length-actCount;
+  const odCount=borrowers.filter(b=>overdueDays(b)>0&&b.status!=='closed').length;
+
+  let html=borrowers.map(b=>{
+    const paid=paidDays(b.id), total=totalDays(b);
+    const col=paid*b.daily, pend=pendingDays(b)*b.daily;
+    const od=overdueDays(b), done=b.status==='closed'||paid>=total;
+    const rs=riskScore(b);
+    return `<div class="sr">
+      <div>
+        <div style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px">
+          ${b.name}
+          <span class="badge ${riskClass(rs)==='risk-hi'?'ba':riskClass(rs)==='risk-md'?'bg':'br'}" style="font-size:9px">${riskLabel(rs)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--ink3)">${paid}/${total} days${od>0&&!done?` · <span style="color:var(--red)">${od} overdue</span>`:''}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="sv g">${fm(col)}</div>
+        <div style="font-size:12px;color:${done?'var(--ink3)':'var(--red)'}">${done?'Closed':fm(pend)+' left'}</div>
+      </div>
+    </div>`;
+  }).join('');
+  html+=`<div class="sr"><span style="font-size:12px;color:var(--ink3)">${actCount} active · ${closedCount} closed · ${odCount} overdue</span></div>`;
+  document.getElementById('sum-rows').innerHTML=html;
+}
+
+// ── EXPENSES ───────────────────────────────────────────────
+async function addExpense(){
+  const data={
+    date:document.getElementById('ex-date').value,
+    category:document.getElementById('ex-cat').value,
+    description:document.getElementById('ex-desc').value.trim(),
+    amount:parseFloat(document.getElementById('ex-amount').value)||0
+  };
+  if(!data.amount||!data.date){toast('Enter date and amount');return;}
+  try{
+    const res=await apiPost({action:'addExpense',data});
+    expenses.push({...data,id:res.id});
+    document.getElementById('ex-amount').value='';
+    document.getElementById('ex-desc').value='';
+    renderExpenses(); toast('Expense added');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+async function deleteExpense(id){
+  try{
+    await apiPost({action:'deleteExpense',id});
+    expenses=expenses.filter(e=>e.id!==id);
+    renderExpenses(); toast('Deleted');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+function renderExpenses(){
+  const exd=document.getElementById('ex-date');
+  if(!exd.value) exd.value=new Date().toISOString().split('T')[0];
+
+  const desktop=document.getElementById('expense-list-desktop');
+  const mobile=document.getElementById('expense-list-mobile');
+  const empty='<div class="empty">No expenses yet</div>';
+
+  if(!expenses.length){
+    if(desktop) desktop.innerHTML=empty;
+    if(mobile) mobile.innerHTML=empty;
+    return;
+  }
+  const totalAmt=expenses.reduce((s,e)=>s+Number(e.amount),0);
+  const sorted=[...expenses].sort((a,b)=>b.date>a.date?1:-1);
+  const byMonth={};
+  sorted.forEach(e=>{
+    const m=String(e.date).substring(0,7);
+    if(!byMonth[m]) byMonth[m]=[];
+    byMonth[m].push(e);
+  });
+
+  // Desktop: table layout
+  let dhtml='';
+  Object.keys(byMonth).sort().reverse().forEach(m=>{
+    const mTotal=byMonth[m].reduce((s,e)=>s+Number(e.amount),0);
+    dhtml+=`<div class="sec-title" style="margin-top:.75rem">${m} — ${fm(mTotal)}</div>`;
+    dhtml+=`<table class="etable"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead><tbody>`;
+    dhtml+=byMonth[m].map(e=>`<tr>
+      <td>${e.date}</td>
+      <td><span class="badge bo">${e.category}</span></td>
+      <td style="color:var(--ink3)">${e.description||'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:500">${fm(e.amount)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')">✕</button></td>
+    </tr>`).join('');
+    dhtml+='</tbody></table>';
+  });
+  dhtml+=`<div style="text-align:right;font-weight:600;font-size:14px;margin-top:12px;font-family:'JetBrains Mono',monospace">Total: ${fm(totalAmt)}</div>`;
+  if(desktop) desktop.innerHTML=dhtml;
+
+  // Mobile: card layout
+  let mhtml='';
+  Object.keys(byMonth).sort().reverse().forEach(m=>{
+    const mTotal=byMonth[m].reduce((s,e)=>s+Number(e.amount),0);
+    mhtml+=`<div class="sec-title" style="margin-top:.6rem">${m} — ${fm(mTotal)}</div>`;
+    mhtml+=byMonth[m].map(e=>`
+      <div class="exp-card">
+        <div style="width:32px;height:32px;border-radius:8px;background:var(--orange-b);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="font-size:14px">${{Petrol:'⛽',Phone:'📱',Food:'🍱',Printing:'🖨',Other:'📦'}[e.category]||'💰'}</span>
+        </div>
+        <div class="ec-info">
+          <div class="ec-title">${e.description||e.category}</div>
+          <div class="ec-sub"><span class="badge bo">${e.category}</span> · ${e.date}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+          <div class="ec-amt">${fm(e.amount)}</div>
+          <button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')" style="padding:4px 8px;min-height:28px;font-size:11px">✕</button>
+        </div>
+      </div>`).join('');
+  });
+  mhtml+=`<div style="text-align:right;font-weight:600;font-size:14px;margin-top:10px;font-family:'JetBrains Mono',monospace">Total: ${fm(totalAmt)}</div>`;
+  if(mobile) mobile.innerHTML=mhtml;
+}
+
+// ── CAPITAL ────────────────────────────────────────────────
+async function addCapitalEntry(){
+  const type=document.getElementById('cap-type').value;
+  const rawAmount=parseFloat(document.getElementById('cap-amount').value)||0;
+  const amount=type==='withdraw'?-Math.abs(rawAmount):Math.abs(rawAmount);
+  const data={
+    date:document.getElementById('cap-date').value,
+    type,amount,
+    note:document.getElementById('cap-note').value.trim()
+  };
+  if(!rawAmount||!data.date){toast('Enter date and amount');return;}
+  try{
+    const res=await apiPost({action:'addCapital',data});
+    capitalEntries.push({...data,id:res.id});
+    document.getElementById('cap-amount').value='';
+    document.getElementById('cap-note').value='';
+    renderCapital(); toast('Entry added');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+function renderCapital(){
+  const cd=document.getElementById('cap-date');
+  if(!cd.value) cd.value=new Date().toISOString().split('T')[0];
+
+  // Compute capital summary
+  let injected=0, lent=0, recovered=0, expenses_total=0, withdrawn=0;
+  capitalEntries.forEach(c=>{
+    const a=Number(c.amount);
+    if(c.type==='inject') injected+=a;
+    else if(c.type==='lent') lent+=Math.abs(a);       // stored as negative
+    else if(c.type==='collected') recovered+=a;
+    else if(c.type==='expense') expenses_total+=Math.abs(a);
+    else if(c.type==='withdraw') withdrawn+=Math.abs(a);
+  });
+
+  const deployed=lent-recovered;
+  const available=injected-lent+recovered-expenses_total-withdrawn;
+  const profit=recovered-lent;
+
+  document.getElementById('cap-metrics').innerHTML=`
+    <div class="metric"><div class="mv">${fm(injected)}</div><div class="ml">Total Capital</div></div>
+    <div class="metric"><div class="mv" style="color:${available>=0?'var(--gold)':'#e57373'}">${fm(Math.max(0,available))}</div><div class="ml">Available to Lend</div></div>
+    <div class="metric"><div class="mv">${fm(deployed)}</div><div class="ml">Deployed (Net)</div></div>
+    <div class="metric"><div class="mv" style="color:${profit>=0?'#4caf50':'#e57373'}">${fm(profit)}</div><div class="ml">P&L</div></div>`;
+
+  const el=document.getElementById('cap-ledger');
+  if(!capitalEntries.length){el.innerHTML='<div class="empty">No capital entries yet</div>';return;}
+  const sorted=[...capitalEntries].sort((a,b)=>b.date>a.date?1:-1).slice(0,30);
+  const typeColors={inject:'ba',lent:'br',collected:'ba',expense:'bo',withdraw:'bc'};
+  const typeLabels={inject:'Capital In',lent:'Lent Out',collected:'Collected',expense:'Expense',withdraw:'Withdrawn'};
+  el.innerHTML=sorted.map(c=>`
+    <div class="ledger-row">
+      <div class="ledger-info">
+        <div class="ledger-title"><span class="badge ${typeColors[c.type]||'bc'}">${typeLabels[c.type]||c.type}</span></div>
+        <div class="ledger-sub">${c.note||'—'} · ${c.date}</div>
+      </div>
+      <div class="ledger-amt" style="color:${Number(c.amount)<0?'var(--red)':'var(--green)'}">${Number(c.amount)>=0?'+':''}${fm(c.amount)}</div>
+    </div>`).join('');
+}
+
+// ── SETTINGS ───────────────────────────────────────────────
+function renderSettings(){
+  const url=localStorage.getItem('lt_url')||'';
+  document.getElementById('url-input').value=url;
+  document.getElementById('conn-status').textContent=url?'URL set: '+url.substring(0,55)+'…':'Not configured.';
+}
+function saveUrl(){
+  const url=document.getElementById('url-input').value.trim();
+  if(!url){toast('Enter a URL');return;}
+  localStorage.setItem('lt_url',url);
+  toast('Saved! Testing…'); testConn();
+}
+async function testConn(){
+  try{
+    const res=await api({action:'getBorrowers'});
+    document.getElementById('conn-status').innerHTML='<span style="color:var(--green)">✓ Connected · '+res.length+' borrowers found</span>';
+    toast('Connected!'); await refreshAll();
+  }catch(e){
+    document.getElementById('conn-status').innerHTML='<span style="color:var(--red)">✗ '+e.message+'</span>';
+    toast('⚠ '+e.message);
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────
+['f-date','ex-date','cap-date'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.value=new Date().toISOString().split('T')[0];
+});
+
+if(sUrl()&&sUrl()!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'){
+  refreshAll();
+}else{
+  document.getElementById('sync-dot').className='dot err';
+  document.getElementById('sync-lbl').textContent='Not configured';
+}
+</script>
+</body>
+</html>
