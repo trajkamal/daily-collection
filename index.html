@@ -1260,10 +1260,11 @@ function renderCapital(){
   const deployed=lent-recovered;
   const available=injected-lent+recovered-expenses_total-withdrawn;
   const profit=recovered-lent;
+  const availableLabel=available>=0?'Available to Lend':'Shortfall';
 
   document.getElementById('cap-metrics').innerHTML=`
     <div class="metric"><div class="mv">${fm(injected)}</div><div class="ml">Total Capital</div></div>
-    <div class="metric"><div class="mv" style="color:${available>=0?'var(--gold)':'#e57373'}">${fm(Math.max(0,available))}</div><div class="ml">Available to Lend</div></div>
+    <div class="metric"><div class="mv" style="color:${available>=0?'var(--gold)':'#e57373'}">${fm(available)}</div><div class="ml">${availableLabel}</div></div>
     <div class="metric"><div class="mv">${fm(deployed)}</div><div class="ml">Deployed (Net)</div></div>
     <div class="metric"><div class="mv" style="color:${profit>=0?'#4caf50':'#e57373'}">${fm(profit)}</div><div class="ml">P&L</div></div>`;
 
