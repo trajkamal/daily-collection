@@ -268,7 +268,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);m
   <button class="nb" onclick="showPage('summary')">Summary</button>
   <button class="nb" onclick="showPage('expenses')">Expenses</button>
   <button class="nb" onclick="showPage('capital')">Capital</button>
-  <button class="nb" onclick="showPage('settings')">Settings</button>
 </div>
 
 <!-- ══ BOTTOM NAV (mobile) ══ -->
@@ -299,7 +298,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);m
     <button onclick="showPage('summary');closeMoreMenu()">Summary</button>
     <button onclick="showPage('expenses');closeMoreMenu()">Expenses</button>
     <button onclick="showPage('capital');closeMoreMenu()">Capital</button>
-    <button onclick="showPage('settings');closeMoreMenu()">Settings</button>
   </div>
 </div>
 
@@ -442,31 +440,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);m
   </div>
 </div>
 
-<!-- ══ SETTINGS ══ -->
-<div id="page-settings" class="page">
-  <div class="card" style="background:var(--gold-l);border-color:var(--gold-b)">
-    <div class="card-title">Google Sheets Setup</div>
-    <ol style="font-size:13px;color:var(--ink3);line-height:2.2;margin-left:18px;margin-bottom:1rem">
-      <li>Open your Google Sheet → <code style="background:rgba(0,0,0,.07);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px">Extensions</code> → <code style="background:rgba(0,0,0,.07);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px">Apps Script</code></li>
-      <li>Paste <strong>Code.gs</strong> contents, click Save</li>
-      <li>Deploy → New Deployment → Web App</li>
-      <li>Execute as: <strong>Me</strong> · Who has access: <strong>Anyone</strong></li>
-      <li>Copy the URL and paste below</li>
-    </ol>
-    <div class="url-row" style="display:flex;gap:8px">
-      <div class="field" style="flex:1;margin:0"><input type="url" id="url-input" placeholder="https://script.google.com/macros/s/.../exec"></div>
-      <button class="btn btn-gold" onclick="saveUrl()">Save & Connect</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title">Connection</div>
-    <div id="conn-status" style="font-size:13px;color:var(--ink3)">Checking…</div>
-    <div class="btn-row" style="margin-top:.75rem">
-      <button class="btn btn-ghost btn-sm" onclick="testConn()">Test Connection</button>
-      <button class="btn btn-ghost btn-sm" onclick="refreshAll()">Refresh Data</button>
-    </div>
-  </div>
-</div>
+
 
 </div><!-- /main -->
 
@@ -557,7 +531,7 @@ async function refreshAll(){
 }
 
 // ── Nav ────────────────────────────────────────────────────
-const PAGES=['dashboard','borrowers','add','collection','summary','expenses','capital','settings'];
+const PAGES=['dashboard','borrowers','add','collection','summary','expenses','capital'];
 function showPage(p){
   PAGES.forEach(n=>{
     document.getElementById('page-'+n).classList.toggle('active',n===p);
@@ -583,7 +557,6 @@ function showPage(p){
   if(p==='summary')    renderSummary();
   if(p==='expenses')   renderExpenses();
   if(p==='capital')    renderCapital();
-  if(p==='settings')   renderSettings();
 }
 function toggleMoreMenu(){
   document.getElementById('more-menu').classList.toggle('open');
@@ -1310,27 +1283,7 @@ function renderCapital(){
 }
 
 // ── SETTINGS ───────────────────────────────────────────────
-function renderSettings(){
-  const url=localStorage.getItem('lt_url')||'';
-  document.getElementById('url-input').value=url;
-  document.getElementById('conn-status').textContent=url?'URL set: '+url.substring(0,55)+'…':'Not configured.';
-}
-function saveUrl(){
-  const url=document.getElementById('url-input').value.trim();
-  if(!url){toast('Enter a URL');return;}
-  localStorage.setItem('lt_url',url);
-  toast('Saved! Testing…'); testConn();
-}
-async function testConn(){
-  try{
-    const res=await api({action:'getBorrowers'});
-    document.getElementById('conn-status').innerHTML='<span style="color:var(--green)">✓ Connected · '+res.length+' borrowers found</span>';
-    toast('Connected!'); await refreshAll();
-  }catch(e){
-    document.getElementById('conn-status').innerHTML='<span style="color:var(--red)">✗ '+e.message+'</span>';
-    toast('⚠ '+e.message);
-  }
-}
+
 
 // ── INIT ───────────────────────────────────────────────────
 ['f-date','ex-date','cap-date'].forEach(id=>{
