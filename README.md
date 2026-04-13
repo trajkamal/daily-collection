@@ -1,6 +1,6 @@
 # LendTrack v2
 
-A comprehensive microfinance lending management system built with Google Apps Script and vanilla JavaScript. Track borrowers, manage daily payments, monitor loan status, and maintain detailed expense & capital ledgers—all from a responsive web interface connected to Google Sheets.
+A comprehensive microfinance lending management system built with Firebase Firestore and vanilla JavaScript. Track borrowers, manage daily payments, monitor loan status, and maintain detailed expense & capital ledgers—all from a responsive web interface with real-time data synchronization.
 
 ## Features
 
@@ -41,62 +41,177 @@ A comprehensive microfinance lending management system built with Google Apps Sc
 
 ## Tech Stack
 
-- **Backend**: Google Apps Script (GAS)
+- **Backend**: Firebase Firestore (NoSQL database)
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript
-- **Database**: Google Sheets
+- **Database**: Firebase Firestore
+- **Hosting**: Firebase Hosting (optional)
 - **Fonts**: DM Serif Display, DM Sans, JetBrains Mono
-- **No external dependencies** (runs entirely in Google Sheets)
+- **Real-time sync**: Firebase real-time listeners
 
 ## Installation
 
-### 1. Set Up Google Sheet
-- Create a new Google Sheet
-- Share it with yourself or teammates
+### 1. Set Up Firebase Project
 
-### 2. Deploy Apps Script Backend
-1. Open your Google Sheet
-2. Click **Extensions** > **Apps Script**
-3. Open the editor and paste the entire contents of `Code.gs`
-4. Click **Save**
-5. Click **Deploy** > **New Deployment**
-6. Select type: **Web App**
-   - Execute as: Your email
-   - Who has access: Anyone
-7. Click **Deploy** and **copy the deployment URL**
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Click "Create a project" or select an existing one
+3. Enable Firestore Database:
+   - Go to Firestore Database > Create database
+   - Choose "Start in test mode" for development
+   - Select a location for your database
 
-### 3. Configure Frontend
-1. In `config.js`, replace `'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'` with your deployment URL:
-   ```javascript
-   const CONFIG = {
-     SCRIPT_URL: 'https://script.google.com/macros/d/YOUR-DEPLOYMENT-ID/userweb'
-   };
-   ```
+### 2. Configure Firebase in Your App
 
-### 4. Access the App
-- Open `index.html` in your browser
-- The app will connect to your Google Sheet automatically
+1. In your Firebase project, go to Project Settings > General > Your apps
+2. Click "Add app" and select Web app (</>)
+3. Register your app with a nickname
+4. Copy the Firebase config object
+5. Paste it into `firebase.js`, replacing the placeholder values
+
+### 3. Install Dependencies
+
+```bash
+npm install
+```
+
+### 4. Run Locally
+
+```bash
+npm start
+```
+
+This will start a local server at `http://localhost:3000`
+
+### 5. Deploy to Firebase (Optional)
+
+```bash
+npm run deploy
+```
+
+## Data Migration from Google Sheets
+
+If you have existing data in Google Sheets, follow these steps to migrate it to Firestore:
+
+### Option 1: Manual Migration
+1. Open your Google Sheet and export each sheet as CSV
+2. Open `migrate.js` in your editor
+3. Convert your CSV data to JavaScript arrays in the format shown
+4. Open your Firebase app in the browser
+5. Open browser developer tools (F12) > Console
+6. Run `migrateFromSheets()` to import your data
+
+### Option 2: Automated Migration Script
+For larger datasets, you can create a Node.js script using the Firebase Admin SDK:
+
+```javascript
+// migrate-data.js
+const admin = require('firebase-admin');
+const serviceAccount = require('./service-account-key.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
+
+// Add your migration logic here
+// Read from CSV files and write to Firestore collections
+```
+
+### Data Format Reference
+
+**Borrowers Collection:**
+```javascript
+{
+  name: "John Doe",
+  phone: "9876543210",
+  aadhar: "1234 5678 9012",
+  address: "123 Main St, City",
+  amount: 10000,
+  daily: 100,
+  startDate: "2024-01-01",
+  createdAt: "2024-01-01T10:00:00.000Z",
+  notes: "Good borrower",
+  status: "active"
+}
+```
+
+**Payments Collection:**
+```javascript
+{
+  borrowerId: "borrower-doc-id",
+  day: 5,
+  paidAt: "2024-01-05T10:00:00.000Z",
+  amount: 100
+}
+```
+
+**Loans Collection:**
+```javascript
+{
+  borrowerId: "borrower-doc-id",
+  amount: 10000,
+  daily: 100,
+  startDate: "2024-01-01",
+  endDate: "",
+  status: "active",
+  createdAt: "2024-01-01T10:00:00.000Z"
+}
+```
 
 ## File Structure
 
 ```
 daily-collection/
-├── Code.gs          # Google Apps Script backend (endpoints & database operations)
-├── config.js        # Configuration (deployment URL)
+├── firebase.js      # Firebase configuration and initialization
 ├── index.html       # Frontend UI & logic
+├── package.json     # Dependencies and scripts
 ├── README.md        # This file
 └── .gitignore       # Git ignore rules
 ```
 
-## API Endpoints
+## Firestore Collections
 
-All requests go through Google Apps Script with `action` parameter.
+The app uses the following Firestore collections:
 
-### GET Requests
-- `getBorrowers` - Fetch all borrowers
-- `getAllPayments` - Get payment records grouped by borrower
-- `getLoanHistory` - Get loan history (optionally filtered by borrowerId)
-- `getExpenses` - Fetch all expenses
-- `getCapital` - Get complete capital/ledger history
+- `borrowers` - Borrower information
+- `payments` - Daily payment records
+- `loans` - Loan history
+- `expenses` - Business expenses
+- `capital` - Capital ledger entries
+
+## Security Rules
+
+For production, set up Firestore security rules in the Firebase Console:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write for authenticated users
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+## API Methods
+
+The app uses Firebase Firestore directly with these main operations:
+
+- `getBorrowers()` - Fetch all borrowers
+- `getAllPayments()` - Get payment records grouped by borrower
+- `getLoanHistory()` - Get loan history (optionally filtered by borrowerId)
+- `getExpenses()` - Fetch all expenses
+- `getCapital()` - Get complete capital/ledger history
+- `addBorrower()` - Create new borrower
+- `updateBorrower()` - Update borrower details
+- `togglePayment()` - Mark/unmark payment for a day
+- `bulkPayment()` - Mark multiple days as paid
+- `renewLoan()` - Renew loan with new terms
+- `closeLoan()` - Close active loan
+- `addExpense()` - Record business expense
+- `addCapital()` - Add capital entry
 
 ### POST Requests
 - `addBorrower` - Create new borrower

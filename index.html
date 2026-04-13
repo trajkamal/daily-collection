@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LendTrack v2</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 <style>
 /* ── Variables ─────────────────────────────────────────── */
 :root{
@@ -478,14 +481,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);m
 
 <div class="toast-w"><div class="toast" id="toast"></div></div>
 
-<script src="config.js"></script>
+<script src="firebase.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────
 let borrowers=[], payments={}, expenses=[], capitalEntries=[], loanHistory=[];
 let bulkSelected=new Set(), bulkBorrowerId='';
 
-// ── API ────────────────────────────────────────────────────
-function sUrl(){return localStorage.getItem('lt_url')||CONFIG.SCRIPT_URL||'';}
+// ── Firebase API ──────────────────────────────────────────
 function setSyncing(on){
   document.getElementById('sync-dot').className='dot'+(on?' spin':'');
   document.getElementById('sync-lbl').textContent=on?'Syncing…':'Connected';
@@ -494,36 +496,335 @@ function setErr(){
   document.getElementById('sync-dot').className='dot err';
   document.getElementById('sync-lbl').textContent='Error';
 }
-async function api(params){
-  const u=sUrl();
-  if(!u||u==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') throw new Error('Not configured. Go to Settings.');
+
+async function getBorrowers() {
   setSyncing(true);
-  try{
-    const r=await fetch(u+'?'+new URLSearchParams(params));
-    const d=await r.json();
-    if(d.error) throw new Error(d.error);
-    return d;
-  }finally{setSyncing(false);}
+  try {
+    const snapshot = await db.collection('borrowers').get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } finally {
+    setSyncing(false);
+  }
 }
-async function apiPost(body){
-  const u=sUrl();
-  if(!u||u==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') throw new Error('Not configured. Go to Settings.');
+
+async function getAllPayments() {
   setSyncing(true);
-  try{
-    const r=await fetch(u,{method:'POST',body:JSON.stringify(body)});
-    const d=await r.json();
-    if(d.error) throw new Error(d.error);
-    return d;
-  }finally{setSyncing(false);}
+  try {
+    const snapshot = await db.collection('payments').get();
+    const result = {};
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const bid = data.borrowerId;
+      if (!result[bid]) result[bid] = [];
+      result[bid].push(data.day);
+    });
+    return result;
+  } finally {
+    setSyncing(false);
+  }
 }
+
+async function getExpenses() {
+  setSyncing(true);
+  try {
+    const snapshot = await db.collection('expenses').get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function getCapital() {
+  setSyncing(true);
+  try {
+    const snapshot = await db.collection('capital').get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function getLoanHistory(borrowerId) {
+  setSyncing(true);
+  try {
+    let query = db.collection('loans');
+    if (borrowerId) {
+      query = query.where('borrowerId', '==', borrowerId);
+    }
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function addBorrower(data) {
+  setSyncing(true);
+  try {
+    const now = new Date().toISOString();
+    const docRef = await db.collection('borrowers').add({
+      ...data,
+      createdAt: now,
+      status: 'active'
+    });
+    // Add loan history
+    await db.collection('loans').add({
+      borrowerId: docRef.id,
+      amount: data.amount,
+      daily: data.daily,
+      startDate: data.startDate,
+      endDate: '',
+      status: 'active',
+      createdAt: now
+    });
+    // Add capital entry
+    await db.collection('capital').add({
+      date: now.split('T')[0],
+      type: 'lent',
+      amount: -Math.abs(data.amount),
+      note: 'Lent to ' + data.name,
+      createdAt: now
+    });
+    return { success: true, id: docRef.id };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function updateBorrower(data) {
+  setSyncing(true);
+  try {
+    await db.collection('borrowers').doc(data.id).update({
+      ...data,
+      updatedAt: new Date().toISOString()
+    });
+    return { success: true };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function updateNotes(id, notes) {
+  setSyncing(true);
+  try {
+    await db.collection('borrowers').doc(id).update({
+      notes: notes,
+      updatedAt: new Date().toISOString()
+    });
+    return { success: true };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function deleteBorrower(id) {
+  setSyncing(true);
+  try {
+    const paymentsSnapshot = await db.collection('payments').where('borrowerId', '==', id).get();
+    const batch = db.batch();
+    batch.delete(db.collection('borrowers').doc(id));
+    paymentsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    return { success: true };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function togglePayment(borrowerId, day, amount) {
+  setSyncing(true);
+  try {
+    const existing = await db.collection('payments')
+      .where('borrowerId', '==', borrowerId)
+      .where('day', '==', Number(day))
+      .get();
+
+    if (!existing.empty) {
+      // Remove payment
+      await existing.docs[0].ref.delete();
+      return { success: true, action: 'removed', day };
+    } else {
+      // Add payment
+      const now = new Date().toISOString();
+      await db.collection('payments').add({
+        borrowerId,
+        day: Number(day),
+        paidAt: now,
+        amount: amount || 0
+      });
+      // Add capital entry
+      await db.collection('capital').add({
+        date: now.split('T')[0],
+        type: 'collected',
+        amount: Math.abs(amount || 0),
+        note: 'Day ' + day + ' from borrower ' + borrowerId,
+        createdAt: now
+      });
+      return { success: true, action: 'added', day };
+    }
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function bulkPayment(borrowerId, days, amountPerDay) {
+  setSyncing(true);
+  try {
+    const existingSnapshot = await db.collection('payments')
+      .where('borrowerId', '==', borrowerId)
+      .get();
+    const existingDays = new Set(existingSnapshot.docs.map(doc => doc.data().day));
+
+    const now = new Date().toISOString();
+    const added = [];
+    const batch = db.batch();
+
+    for (const day of days) {
+      if (!existingDays.has(Number(day))) {
+        const ref = db.collection('payments').doc();
+        batch.set(ref, { borrowerId, day: Number(day), paidAt: now, amount: amountPerDay });
+        added.push(day);
+      }
+    }
+
+    if (added.length > 0) {
+      const capRef = db.collection('capital').doc();
+      batch.set(capRef, {
+        date: now.split('T')[0], type: 'collected',
+        amount: added.length * amountPerDay,
+        note: 'Bulk: days ' + added.join(',') + ' borrower ' + borrowerId,
+        createdAt: now
+      });
+      await batch.commit();
+    }
+
+    return { success: true, added };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function fbRenewLoan(borrowerId, data) {
+  setSyncing(true);
+  try {
+    const now = new Date().toISOString();
+    const batch = db.batch();
+
+    // Close existing loan records
+    const existingLoans = await db.collection('loans')
+      .where('borrowerId', '==', borrowerId)
+      .where('status', '==', 'active')
+      .get();
+    existingLoans.docs.forEach(doc => {
+      batch.update(doc.ref, { endDate: now.split('T')[0], status: 'closed' });
+    });
+
+    // Delete existing payments
+    const paymentsSnapshot = await db.collection('payments')
+      .where('borrowerId', '==', borrowerId)
+      .get();
+    paymentsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+
+    // Update borrower
+    batch.update(db.collection('borrowers').doc(borrowerId), {
+      ...data, status: 'active', updatedAt: now
+    });
+
+    // Add new loan
+    const loanRef = db.collection('loans').doc();
+    batch.set(loanRef, {
+      borrowerId, amount: data.amount, daily: data.daily,
+      startDate: data.startDate, endDate: '', status: 'active', createdAt: now
+    });
+
+    // Add capital entry
+    const capRef = db.collection('capital').doc();
+    batch.set(capRef, {
+      date: now.split('T')[0], type: 'lent',
+      amount: -Math.abs(data.amount),
+      note: 'Renewal for ' + data.name, createdAt: now
+    });
+
+    await batch.commit();
+    return { success: true };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function fbCloseLoan(borrowerId) {
+  setSyncing(true);
+  try {
+    const now = new Date().toISOString();
+    const batch = db.batch();
+
+    batch.update(db.collection('borrowers').doc(borrowerId), {
+      status: 'closed', updatedAt: now
+    });
+
+    const activeLoans = await db.collection('loans')
+      .where('borrowerId', '==', borrowerId)
+      .where('status', '==', 'active')
+      .get();
+    activeLoans.docs.forEach(doc => {
+      batch.update(doc.ref, { endDate: now.split('T')[0], status: 'closed' });
+    });
+
+    await batch.commit();
+    return { success: true };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function fbAddExpense(data) {
+  setSyncing(true);
+  try {
+    const now = new Date().toISOString();
+    const docRef = await db.collection('expenses').add({ ...data, createdAt: now });
+    await db.collection('capital').add({
+      date: data.date, type: 'expense',
+      amount: -Math.abs(data.amount),
+      note: data.category + ': ' + data.description, createdAt: now
+    });
+    return { success: true, id: docRef.id };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function fbDeleteExpense(id) {
+  setSyncing(true);
+  try {
+    await db.collection('expenses').doc(id).delete();
+    return { success: true };
+  } finally {
+    setSyncing(false);
+  }
+}
+
+async function addCapital(data) {
+  setSyncing(true);
+  try {
+    const now = new Date().toISOString();
+    const docRef = await db.collection('capital').add({
+      ...data,
+      createdAt: now
+    });
+    return { success: true, id: docRef.id };
+  } finally {
+    setSyncing(false);
+  }
+}
+
 async function refreshAll(){
   try{
     [borrowers,payments,expenses,capitalEntries,loanHistory]=await Promise.all([
-      api({action:'getBorrowers'}),
-      api({action:'getAllPayments'}),
-      api({action:'getExpenses'}),
-      api({action:'getCapital'}),
-      api({action:'getLoanHistory'})
+      getBorrowers(),
+      getAllPayments(),
+      getExpenses(),
+      getCapital(),
+      getLoanHistory()
     ]);
     renderCurrentPage();
     toast('Data refreshed');
@@ -674,7 +975,7 @@ function renderDashboard(){
       <div class="metrics metrics-3" style="margin-bottom:0">
         <div class="metric"><div class="mv">${fm(ts.expected)}</div><div class="ml">Expected Today</div></div>
         <div class="metric"><div class="mv" style="color:#4caf50">${fm(ts.collected)}</div><div class="ml">Collected</div></div>
-        <div class="metric"><div class="mv" style="color:${ts.shortfall>0?'#e57373':var_gold}">${fm(ts.shortfall)}</div><div class="ml">Shortfall</div></div>
+        <div class="metric"><div class="mv" style="color:${ts.shortfall>0?'#e57373':var_gold()}">${fm(ts.shortfall)}</div><div class="ml">Shortfall</div></div>
       </div>
     </div>`;
 
@@ -794,12 +1095,12 @@ async function saveBorrower(){
   try{
     if(editId){
       data.id=editId;
-      await apiPost({action:'updateBorrower',data});
+      await updateBorrower(data);
       const idx=borrowers.findIndex(b=>b.id===editId);
       if(idx>-1) borrowers[idx]={...borrowers[idx],...data};
       toast('Updated!');
     }else{
-      const res=await apiPost({action:'addBorrower',data});
+      const res=await addBorrower(data);
       borrowers.push({...data,id:res.id,createdAt:new Date().toISOString(),status:'active'});
       toast('Borrower added!');
     }
@@ -888,7 +1189,7 @@ function closeDetailModal(){document.getElementById('detail-overlay').classList.
 async function closeLoan(id){
   if(!confirm('Mark this loan as closed?')) return;
   try{
-    await apiPost({action:'closeLoan',borrowerId:id});
+    await fbCloseLoan(id);
     const idx=borrowers.findIndex(b=>b.id===id);
     if(idx>-1) borrowers[idx].status='closed';
     closeDetailModal(); renderBorrowers(); toast('Loan closed.');
@@ -926,7 +1227,7 @@ async function renewLoan(id){
     startDate:document.getElementById('f-date').value
   };
   try{
-    await apiPost({action:'renewLoan',borrowerId:id,data});
+    await fbRenewLoan(id, data);
     const idx=borrowers.findIndex(b=>b.id===id);
     if(idx>-1) borrowers[idx]={...borrowers[idx],...data,status:'active'};
     payments[id]=[];
@@ -942,7 +1243,7 @@ async function renewLoan(id){
 async function confirmDelete(id,name){
   if(!confirm('Delete '+name+'? This removes all payment records too.')) return;
   try{
-    await apiPost({action:'deleteBorrower',id});
+    await deleteBorrower(id);
     borrowers=borrowers.filter(b=>b.id!==id);
     delete payments[id];
     closeDetailModal(); renderBorrowers(); toast('Deleted.');
@@ -1010,7 +1311,7 @@ function renderCollection(){
 async function toggleDay(id,day,el){
   const b=borrowers.find(x=>x.id===id);
   try{
-    const res=await apiPost({action:'togglePayment',borrowerId:id,day,amount:b?Number(b.daily):0});
+    const res=await togglePayment(id,day,b?Number(b.daily):0);
     if(!payments[id]) payments[id]=[];
     if(res.action==='added'){
       payments[id].push(day); el.className='dc paid'; toast('Day '+day+' paid');
@@ -1033,7 +1334,7 @@ async function markToday(){
   if(!day){toast('Today is outside loan period');return;}
   if((payments[id]||[]).includes(day)){toast('Today already marked');return;}
   try{
-    await apiPost({action:'togglePayment',borrowerId:id,day,amount:Number(b.daily)});
+    await togglePayment(id,day,Number(b.daily));
     if(!payments[id]) payments[id]=[];
     payments[id].push(day);
     renderCollection(); toast('Day '+day+' marked paid!');
@@ -1066,14 +1367,6 @@ function toggleBulkSel(day,el){
 }
 function selectAllUnpaid(){
   const id=bulkBorrowerId; const b=borrowers.find(x=>x.id===id); if(!b) return;
-  const paidSet=new Set(payments[id]||[]);
-  document.querySelectorAll('#bulk-grid .dc:not(.paid)').forEach((el,i)=>{
-    const day=i+1+Array.from(document.querySelectorAll('#bulk-grid .dc')).indexOf(el)-(i);
-    // Re-read from element's text
-    const d=parseInt(el.textContent);
-    if(!paidSet.has(d)){bulkSelected.add(d);el.classList.add('sel');}
-  });
-  // simpler: re-build selection from day grid
   document.querySelectorAll('#bulk-grid .dc:not(.paid)').forEach(el=>{
     const d=parseInt(el.textContent); bulkSelected.add(d); el.classList.add('sel');
   });
@@ -1084,7 +1377,7 @@ async function submitBulk(){
   const b=borrowers.find(x=>x.id===bulkBorrowerId); if(!b) return;
   try{
     const days=Array.from(bulkSelected).sort((a,b)=>a-b);
-    const res=await apiPost({action:'bulkPayment',borrowerId:bulkBorrowerId,days,amount:Number(b.daily)});
+    const res=await bulkPayment(bulkBorrowerId,days,Number(b.daily));
     if(!payments[bulkBorrowerId]) payments[bulkBorrowerId]=[];
     res.added.forEach(d=>payments[bulkBorrowerId].push(d));
     closeBulkModal(); renderCollection();
@@ -1142,7 +1435,7 @@ async function addExpense(){
   };
   if(!data.amount||!data.date){toast('Enter date and amount');return;}
   try{
-    const res=await apiPost({action:'addExpense',data});
+    const res=await fbAddExpense(data);
     expenses.push({...data,id:res.id});
     document.getElementById('ex-amount').value='';
     document.getElementById('ex-desc').value='';
@@ -1152,7 +1445,7 @@ async function addExpense(){
 
 async function deleteExpense(id){
   try{
-    await apiPost({action:'deleteExpense',id});
+    await fbDeleteExpense(id);
     expenses=expenses.filter(e=>e.id!==id);
     renderExpenses(); toast('Deleted');
   }catch(e){toast('⚠ '+e.message);}
@@ -1234,7 +1527,7 @@ async function addCapitalEntry(){
   };
   if(!rawAmount||!data.date){toast('Enter date and amount');return;}
   try{
-    const res=await apiPost({action:'addCapital',data});
+    const res=await addCapital(data);
     capitalEntries.push({...data,id:res.id});
     document.getElementById('cap-amount').value='';
     document.getElementById('cap-note').value='';
@@ -1292,12 +1585,7 @@ function renderCapital(){
   if(el) el.value=new Date().toISOString().split('T')[0];
 });
 
-if(sUrl()&&sUrl()!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'){
-  refreshAll();
-}else{
-  document.getElementById('sync-dot').className='dot err';
-  document.getElementById('sync-lbl').textContent='Not configured';
-}
+refreshAll();
 </script>
 </body>
 </html>
